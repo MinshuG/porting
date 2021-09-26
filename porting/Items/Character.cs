@@ -6,7 +6,6 @@ using CUE4Parse.UE4.Assets.Exports.SkeletalMesh;
 using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Objects.Core.i18N;
 using CUE4Parse.UE4.Objects.UObject;
-using CUE4Parse_Conversion.Materials;
 using CUE4Parse_Conversion.Meshes;
 using Newtonsoft.Json;
 
@@ -15,37 +14,70 @@ namespace porting.Models
     public class Mesh : Base
     {
         public FSoftObjectPath MeshPath;
-        public List<Material> OverrideMaterial;
+        public UObject[] Sockets;
+        public List<Material> Materials;
+        public List<Material> OverrideMaterials;
         public string DiskPath;
 
+        public void LoadInfo()
+        {
+            Materials = new();
+            var obj = MeshPath.Load<USkeletalMesh>();
+            foreach (var material in obj.Materials)
+            {
+                Materials.Add(new Material() { Mat = material.Material.ToString(), MaterialIndex = -1});
+            }
+            Sockets = obj.GetOrDefault<FPackageIndex>("Skeleton").Load()?.GetOrDefault<UObject[]>("Sockets");
+        }
         protected internal override void WriteJson(JsonWriter writer, JsonSerializer serializer)
         {
             base.WriteJson(writer, serializer);
-            
+
             writer.WritePropertyName("MeshPath");
             serializer.Serialize(writer, MeshPath);
 
             writer.WritePropertyName("OverrideMaterials");
             writer.WriteStartArray();
             {
-                foreach (var j in OverrideMaterial)
+                foreach (var j in OverrideMaterials)
                 {
                     serializer.Serialize(writer, j);
                 }
             }
             writer.WriteEndArray();
-            
-            writer.WritePropertyName("DiskPath");
-            writer.WriteValue(DiskPath);
-            
-            writer.WritePropertyName("Props");
+
+            writer.WritePropertyName("Materials");
             writer.WriteStartArray();
             {
-                serializer.Serialize(writer, MeshPath.Load());
+                foreach (var j in Materials)
+                {
+                    serializer.Serialize(writer, j);
+                }
             }
             writer.WriteEndArray();
-        }
 
+            if (Sockets != null)
+            {
+                writer.WritePropertyName("Sockets");
+                writer.WriteStartArray();
+                {
+                    foreach (var j in Sockets)
+                    {
+                        writer.WriteStartObject();
+                        foreach (var property in j.Properties)
+                        {
+                            writer.WritePropertyName(property.Name.Text);
+                            serializer.Serialize(writer, property.Tag);
+                        }
+                        writer.WriteEndObject();
+                    }
+                }
+                writer.WriteEndArray();
+            }            
+
+            writer.WritePropertyName("DiskPath");
+            writer.WriteValue(DiskPath);
+        }
 
         public void SaveToDisk(DirectoryInfo info)
         {
@@ -62,7 +94,7 @@ namespace porting.Models
 
     public class Material: Base
     {
-        public FSoftObjectPath Mat;
+        public string Mat;
         public int? MaterialIndex;
 
         protected internal override void WriteJson(JsonWriter writer, JsonSerializer serializer)
@@ -70,7 +102,8 @@ namespace porting.Models
             base.WriteJson(writer, serializer);
 
             writer.WritePropertyName("Mat");
-            serializer.Serialize(writer, Mat);
+            writer.WriteValue(Mat);
+            // serializer.Serialize(writer, Mat);
 
             writer.WritePropertyName("MaterialIndex");
             writer.WriteValue(MaterialIndex);
@@ -124,17 +157,18 @@ namespace porting.Models
             var mesh = new Mesh
             {
                 MeshPath = export.Get<FSoftObjectPath>("SkeletalMesh"),
-                OverrideMaterial = new List<Material>()
+                OverrideMaterials = new List<Material>()
             };
 
             foreach (var mat in export.GetOrDefault<FStructFallback[]>("MaterialOverrides", Array.Empty<FStructFallback>()))
             {
-                mesh.OverrideMaterial.Add(new Material
+                mesh.OverrideMaterials.Add(new Material
                 {
-                    Mat = mat.Get<FSoftObjectPath>("OverrideMaterial"),
+                    Mat = mat.Get<FSoftObjectPath>("OverrideMaterial").ToString(),
                     MaterialIndex = mat.Get<int>("MaterialOverrideIndex")
                 });
             }
+            mesh.LoadInfo();
             ActualMeshes.Add(mesh);
         }
 

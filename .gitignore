@@ -3,3 +3,5 @@
 porting/bin/
 porting/obj/
 .idea/
+.vscode/
+.vs/

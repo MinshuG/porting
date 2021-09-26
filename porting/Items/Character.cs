@@ -2,10 +2,14 @@
 using System.Collections.Generic;
 using System.IO;
 using CUE4Parse.UE4.Assets.Exports;
+using CUE4Parse.UE4.Assets.Exports.Animation;
 using CUE4Parse.UE4.Assets.Exports.SkeletalMesh;
+using CUE4Parse.UE4.Assets.Exports.StaticMesh;
 using CUE4Parse.UE4.Assets.Objects;
 using CUE4Parse.UE4.Objects.Core.i18N;
 using CUE4Parse.UE4.Objects.UObject;
+using CUE4Parse.Utils;
+using CUE4Parse_Conversion;
 using CUE4Parse_Conversion.Meshes;
 using Newtonsoft.Json;
 
@@ -13,22 +17,55 @@ namespace porting.Models
 {
     public class Mesh : Base
     {
-        public FSoftObjectPath MeshPath;
+        public string MeshPath;
+        public FSoftObjectPath? SoftMeshPath;
+        public FPackageIndex MeshPathindex;
         public UObject[] Sockets;
         public List<Material> Materials;
         public List<Material> OverrideMaterials;
         public string DiskPath;
 
+        private bool _isSk;
+        private USkeletalMesh _loadedObjsk;
+        private UStaticMesh _loadedObjsm;
+
         public void LoadInfo()
         {
             Materials = new();
-            var obj = MeshPath.Load<USkeletalMesh>();
-            foreach (var material in obj.Materials)
+
+            UObject loadedObj;
+            if (SoftMeshPath != null)
             {
-                Materials.Add(new Material() { Mat = material.Material.ToString(), MaterialIndex = -1});
+                loadedObj = SoftMeshPath?.Load<UObject>();
+                MeshPath = SoftMeshPath.ToString();
             }
-            Sockets = obj.GetOrDefault<FPackageIndex>("Skeleton").Load()?.GetOrDefault<UObject[]>("Sockets");
+            else
+            {
+                loadedObj = MeshPathindex.Load<UObject>();
+                MeshPath = MeshPathindex.ConvertToString();
+            }
+
+            if (loadedObj is USkeletalMesh skmesh)
+            {
+                _isSk = true;
+                _loadedObjsk = skmesh;
+                foreach (var material in skmesh.Materials)
+                {
+                    Materials.Add(new Material() { Mat = material.Material.ConvertToString(), MaterialIndex = -1});
+                    Sockets = loadedObj.GetOrDefault<FPackageIndex>("Skeleton").Load()?.GetOrDefault<UObject[]>("Sockets");
+                }    
+            }
+            else if (loadedObj is UStaticMesh mesh)
+            {
+                _loadedObjsm = mesh;
+                foreach (var material in mesh.Materials)
+                {
+                    Materials.Add(new Material() { Mat = material.ConvertToString(), MaterialIndex = -1});
+                    Sockets = loadedObj.GetOrDefault<FPackageIndex>("Skeleton").Load()?.GetOrDefault<UObject[]>("Sockets");
+                }
+            }
         }
+
         protected internal override void WriteJson(JsonWriter writer, JsonSerializer serializer)
         {
             base.WriteJson(writer, serializer);
@@ -82,11 +119,15 @@ namespace porting.Models
         public void SaveToDisk(DirectoryInfo info)
         {
             string path;
-            var sk = MeshPath.Load<USkeletalMesh>();
-            var a = new MeshExporter(sk).MeshLods[0];
+            MeshExporter a;
+            if (_isSk)
+                a = new MeshExporter(_loadedObjsk);
+            else
+                a = new MeshExporter(_loadedObjsm);
+
             if (a.TryWriteToDir(info, out path))
             {
-                var filePath = FixAndCreatePath(info, a.FileName);
+                var filePath = FixAndCreatePath(info, a.MeshName);
                 DiskPath = filePath;
             }
         }
@@ -138,7 +179,7 @@ namespace porting.Models
 
             var mesh = new Mesh
             {
-                MeshPath = export.Get<FSoftObjectPath>("SkeletalMesh"),
+                SoftMeshPath = export.Get<FSoftObjectPath>("SkeletalMesh"),
                 OverrideMaterials = new List<Material>()
             };
 

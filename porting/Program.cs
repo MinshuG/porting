@@ -41,6 +41,9 @@ namespace porting
                     case "AthenaBackpackItemDefinition":
                         exporter = new Backpack(export);
                         break;
+                    case "AthenaGliderItemDefinition":
+                        exporter = new Glider(export);
+                        break;
                     default:
                         exporter = new ExportBase();
                         break;

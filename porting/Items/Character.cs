@@ -110,13 +110,8 @@ namespace porting.Models
         }
     }
 
-    public class Character : Base
+    public class Character : ExportBase
     {
-        public string DisplayName { get; set; }
-        public List<Mesh> ActualMeshes { get; set; }
-
-        private string SaveDir;
-
         public Character(UObject export)
         {
             DisplayName = export.Get<FText>("DisplayName").ToString();
@@ -130,29 +125,16 @@ namespace porting.Models
             {
                 foreach (var cp in cs.Load().Get<FSoftObjectPath[]>("CharacterParts"))
                 {
-                    ParseCP(cp.Load());
+                    ActualMeshes = ParseCP(cp.Load());
                 }
             }
         }
 
-        public void SaveToDisk(string path)
+        public static List<Mesh> ParseCP(UObject export)
         {
-            SaveDir = path;
-
-            var dirinfo = new DirectoryInfo(path);
-            foreach (var mesh in ActualMeshes)
-            {
-                mesh.SaveToDisk(dirinfo);
-            }
-
-            var j = JsonConvert.SerializeObject(this, Formatting.Indented);
-            File.WriteAllText(Path.Join(path, DisplayName + ".json"), j);
-        }
-
-        private void ParseCP(UObject export)
-        {
+            var meshes = new List<Mesh>();
             if(export == null)
-                return;
+                return meshes;
 
             var mesh = new Mesh
             {
@@ -169,28 +151,9 @@ namespace porting.Models
                 });
             }
             mesh.LoadInfo();
-            ActualMeshes.Add(mesh);
+            meshes.Add(mesh);
+            return meshes;
         }
-
-        protected internal override void WriteJson(JsonWriter writer, JsonSerializer serializer)
-        {
-            base.WriteJson(writer, serializer);
-
-            writer.WritePropertyName("DisplayName");
-            writer.WriteValue(DisplayName);
-
-            writer.WritePropertyName("SaveDir");
-            writer.WriteValue(SaveDir);
-
-            writer.WritePropertyName("Meshes");
-            writer.WriteStartArray();
-            {
-                foreach (var j in ActualMeshes)
-                {
-                    serializer.Serialize(writer, j);
-                }
-            }
-            writer.WriteEndArray();
-        }
+        
     }
 }

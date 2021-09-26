@@ -4,6 +4,7 @@ using CUE4Parse.Encryption.Aes;
 using CUE4Parse.FileProvider;
 using CUE4Parse.MappingsProvider;
 using CUE4Parse.UE4.Objects.Core.Misc;
+using CUE4Parse_Conversion;
 using Serilog;
 using porting.Models;
 
@@ -24,19 +25,28 @@ namespace porting
             var provider = new DefaultFileProvider(_gameDirectory, SearchOption.TopDirectoryOnly, true);
             provider.Initialize();
             
-            provider.SubmitKey(new FGuid(), new FAesKey(_aesKey)); // decrypt basic info (1 guid - 1 key)
+            provider.SubmitKey(new FGuid(), new FAesKey(_aesKey));
             
             provider.MappingsContainer = new FileUsmapTypeMappingsProvider(@"C:\Users\Minshu\Desktop\BlenderUmap\run\mappings\++Fortnite+Release-18.00-CL-17468642-Windows_oo.usmap");
 
             var allExports = provider.LoadObjectExports(args[0]);
 
-            foreach (var export in allExports)
-            {
-                if (export.ExportType == "AthenaCharacterItemDefinition")
+            ExportBase exporter;
+            foreach (var export in allExports){
+                switch (export.ExportType)
                 {
-                    var something = new Character(export);
-                    something.SaveToDisk(@"C:\Users\Minshu\Desktop\BlenderUmap\porting");
-                }
+                    case "AthenaCharacterItemDefinition":
+                        exporter = new Character(export);
+                        break;
+                    case "AthenaBackpackItemDefinition":
+                        exporter = new Backpack(export);
+                        break;
+                    default:
+                        exporter = new ExportBase();
+                        break;
+                };
+
+                exporter.SaveToDisk(@"C:\Users\Minshu\Desktop\BlenderUmap\porting");
             }
         }
     }

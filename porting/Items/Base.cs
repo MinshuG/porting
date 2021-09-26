@@ -40,6 +40,7 @@ namespace porting.Models
 
     public class ExportBase : Base
     {
+        public string ID { get; set; }
         public string DisplayName { get; set; }
         public List<Mesh> ActualMeshes { get; set; }
         private string SaveDir;
@@ -67,7 +68,7 @@ namespace porting.Models
 
         public void SaveToDisk(string path)
         {
-            if (ActualMeshes.Count == 0)
+            if (ActualMeshes?.Count == 0)
                 return;
             SaveDir = path;
 
@@ -78,7 +79,7 @@ namespace porting.Models
             }
 
             var j = JsonConvert.SerializeObject(this, Formatting.Indented);
-            File.WriteAllText(Path.Join(path, DisplayName + ".json"), j);
+            File.WriteAllText(Path.Join(path, ID + ".json"), j);
         }
     }
 }

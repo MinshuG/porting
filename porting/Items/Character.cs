@@ -156,9 +156,10 @@ namespace porting.Models
         public Character(UObject export)
         {
             DisplayName = export.Get<FText>("DisplayName").ToString();
+            ID = export.Name;
             ActualMeshes = new List<Mesh>();
 
-            var hid = export.Get<FPackageIndex>("HeroDefinition").Load();
+            var hid = export.GetOrDefault<FPackageIndex>("HeroDefinition").Load();
             if (hid == null)
                 throw new Exception("failed to load hid");
 
@@ -166,7 +167,7 @@ namespace porting.Models
             {
                 foreach (var cp in cs.Load().Get<FSoftObjectPath[]>("CharacterParts"))
                 {
-                    ActualMeshes = ParseCP(cp.Load());
+                    ActualMeshes.AddRange(ParseCP(cp.Load()));
                 }
             }
         }
